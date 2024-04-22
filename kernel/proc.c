@@ -711,3 +711,17 @@ uint64 free_proc(void)
   }
   return n;
 }
+
+uint64
+num_of_not_unused_proc() 
+{
+  uint64 num = 0;
+  for (struct proc *p = proc; p < &proc[NPROC]; p++)
+  {
+    if (p->state != UNUSED)
+    {
+      num++;
+    }
+  }
+  return num;
+}
