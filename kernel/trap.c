@@ -67,20 +67,46 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
+  } else if (r_scause() == 13 || r_scause() == 15)
+  {
+    printf("page fault trap: siganl %d at address %p\n", r_scause(), r_stval());
+    uint64 va = r_stval();
+    if (va > p->sz || va < PGROUNDUP(p->trapframe->sp))
+    {
+      p->killed = 1;
+      goto end;
+    }
+    char* pa = kalloc();
+    if(pa == 0){ 
+      printf("alloc physical memory failed");
+      p->killed = 1;
+      goto end;
+    }
+    memset(pa, 0, PGSIZE);
+    if(mappages(p->pagetable, PGROUNDDOWN(va), PGSIZE, (uint64)pa, PTE_W|PTE_X|PTE_R|PTE_U)){
+      // 映射失败，释放物理内存
+      kfree(pa);
+      p->killed = 1;
+      goto end;
+    }
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     p->killed = 1;
+    goto end;
   }
 
-  if(p->killed)
-    exit(-1);
 
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2)
     yield();
 
   usertrapret();
+end:
+  if (p->killed)
+  {
+    exit(-1);
+  }
 }
 
 //
